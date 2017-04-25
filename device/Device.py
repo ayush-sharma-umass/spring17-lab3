@@ -1,32 +1,78 @@
 import Pyro4
-from constants.Constants import Constants
+from src.constants.Constants import Constants
+import time
 
 @Pyro4.expose
 class Device:
 
     def __init__(self, daemon, nameServer, webServer, processName):
+        """
+        The device class is initialized here.
+        :param daemon: The daemon background process.
+        :param nameServer: The Pyro nameserver
+        :param webServer: The webserver to register. Initially None.
+        :param processName: The self processs name
+        """
         self.state = Constants.DeviceConstants.STATE_OFF
         self.processName = processName
-        self.webServer = webServer
+
+        # Private members
+
+        self._webServer = None
         self._registerOnserver(daemon, nameServer)
 
-    def registerOnServer(self):
+
+    def changeWebServer(self, new_webserver):
+        """
+        Function to change the reporting webserver
+        :param new_webserver: The new reporting webserver
+        :return: None
+        """
+        self._webServer = new_webserver
+        print "Now ", self.processName, " registering with : ", self._webServer
+        self.registerOnWebServer()
+        print "Congrats! You are ", self.processName, " and registered with : ", self._webServer
+
+
+
+    def registerOnWebServer(self):
+        """
+        Calls the reporting webserver to register itself on it.
+        :return: None
+        """
         proxyName = "PYRONAME:" + self._webServer
         webServerProxy = Pyro4.Proxy(proxyName)
-        print("Registering {} with gateWay: {} and gatewayProxy: {}".format(self._name, self._gatewayName, webServerProxy))
-        self._pid = webServerProxy.register(self._name)
+        print("Registering {} with Webserver: {} and WebserverProxy: {}".format(self.processName, proxyName, webServerProxy))
+        webServerProxy.registerOnWebServer(self.processName)
 
 
     def pushState(self):
+        """
+        Pushes its own state to reporting webserver.
+        :return: None
+        """
         proxyName = "PYRONAME:" + self._webServer
         webServerProxy = Pyro4.Proxy(proxyName)
-        webServerProxy.pushState(self.state, self._pid)
+        print("Modified State is {}".format(self.state))
+        curtime = time.time()
+        retval = webServerProxy.pushState(self.processName, self.state,curtime, self.processName)
+        if retval == True:
+            print self.processName, " succesfully pushed state to servers"
 
     def pullState(self):
+        """
+        Function to pull state
+        :return: current timestamp, state
+        """
         curtime = time.time()
         return curtime, self.state
 
     def changeState(self):
+        """
+        Change the current state of the process.
+        :return: None
+        """
+        print("Current State is {}".format(self.state))
         if self.state == Constants.DeviceConstants.STATE_OFF:
             self.state = Constants.DeviceConstants.STATE_ON
         else:
@@ -40,6 +86,6 @@ class Device:
         :return: None
         """
         uri = daemon.register(self)
-        nameserver.register(self._name, uri)
-        print("Sensor registered. Name {} and uri {} ".format(self._name, uri))
+        nameserver.register(self.processName, uri)
+        print("Sensor registered. Name {} and uri {} ".format(self.processName, uri))
         pass

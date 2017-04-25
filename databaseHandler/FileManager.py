@@ -20,7 +20,7 @@ class FileManager:
     def writeFile(self):
         if self.lock == False:
             self.acquireLock()
-            print "reading now"
+            print "Writing now"
             time.sleep(5)
             # go ahead with writing
             pass
